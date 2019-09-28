@@ -102,7 +102,10 @@ _logs:
 status:
 	kubectl get pods -o wide --sort-by="{.spec.nodeName}"
 
-.ONESHELL:
+azure: valid_secrets azure-pvc
+	$(MAKE) tator-image images config gunicorn daphne \
+	azure-pvc postgis pgbouncer redis transcoder packager algorithm submitter \
+	pruner sizer tusd nginx
 
 cluster: valid_secrets update-nfs
 	$(MAKE) tator-image images config metallb cluster-rbac gunicorn daphne \
@@ -160,6 +163,9 @@ cluster-rbac:
 .PHONY: cross-info
 cross-info: ./externals/build_tools/multiArch.py
 	./externals/build_tools/multiArch.py  --help
+
+azure-pvc:
+	envsubst < k8s/azure-pvc.yaml | kubectl apply -f -
 
 metallb:
 	kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.7.3/manifests/metallb.yaml
