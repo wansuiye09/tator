@@ -1,6 +1,6 @@
 #!/bin/bash
 
-secrets=tator-secrets.yaml
+secrets=k8s/tator-secrets.yaml
 
 if [ -L ${secrets} ] && [ -e ${secrets} ]; then
     exit 0

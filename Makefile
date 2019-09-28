@@ -36,9 +36,7 @@ help:
 # Check for a valid secrets file
 .PHONY: valid_secrets
 valid_secrets:
-	@cd k8s
-	@./valid_secrets.sh
-	@cd ..
+	@./k8s/valid_secrets.sh
 
 .PHONY: production_check
 production_check:
