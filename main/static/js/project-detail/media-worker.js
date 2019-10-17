@@ -1,6 +1,6 @@
 importScripts("/static/js/util/fetch-retry.js");
 
-const _fetchBufferSize = 100; // Additional media to fetch past last displayed
+const _fetchBufferSize = 0; // Additional media to fetch past last displayed
 
 self.addEventListener("message", async evt => {
   const msg = evt.data;
@@ -32,8 +32,7 @@ self.addEventListener("message", async evt => {
   } else if (msg.command == "filterSection") {
     // Applies filter to section
     let url = "/rest/EntityMedias/" + self.projectId +
-      "?operation=attribute_count::tator_user_sections" +
-      "&attribute=tator_user_sections::" + msg.sectionName;
+      "?attribute=tator_user_sections::" + msg.sectionName;
     if (msg.query) {
       url += "&search=" + msg.query;
     }
@@ -43,14 +42,13 @@ self.addEventListener("message", async evt => {
       headers: self.headers,
     })
     .then(response => response.json())
-    .then(attrs => updateSection(attrs, msg.query))
+    .then(media => updateSection(msg.sectionName, media, msg.query))
     .catch(err => console.log("Error applying filter: " + err));
   } else if (msg.command == "filterProject") {
     // Applies filter to whole project
-    let url = "/rest/EntityMedias/" + self.projectId +
-      "?operation=attribute_count::tator_user_sections";
+    let url = "/rest/EntityMedias/" + self.projectId;
     if (msg.query) {
-      url += "&search=" + msg.query;
+      url += "?search=" + msg.query;
     }
     fetchRetry(url, {
       method: "GET",
@@ -58,7 +56,7 @@ self.addEventListener("message", async evt => {
       headers: self.headers,
     })
     .then(response => response.json())
-    .then(attrs => updateSections(attrs, msg.query))
+    .then(media => updateSections(media, msg.query))
     .catch(err => console.log("Error applying filter: " + err));
     self.projectFilter = msg.query;
   } else if (msg.command == "init") {
@@ -75,18 +73,11 @@ self.addEventListener("message", async evt => {
       "Accept": "application/json",
       "Content-Type": "application/json"
     };
-    const url = "/rest/EntityMedias/" + msg.projectId +
-      "?operation=attribute_count::tator_user_sections";
-    const attributePromise = fetchRetry(url, {
-      method: "GET",
-      credentials: "omit",
-      headers: self.headers,
-    });
-    let filterUrl = url;
+    let url = "/rest/EntityMedias/" + msg.projectId;
     if (msg.projectFilter) {
-      filterUrl += "&search=" + msg.projectFilter;
+      url += "?search=" + msg.projectFilter;
     }
-    const filterPromise = fetchRetry(filterUrl, {
+    const mediaPromise = fetchRetry(url, {
       method: "GET",
       credentials: "omit",
       headers: self.headers,
@@ -97,14 +88,14 @@ self.addEventListener("message", async evt => {
       credentials: "omit",
       headers: self.headers,
     });
-    Promise.all([attributePromise, filterPromise, algorithmPromise])
+    Promise.all([mediaPromise, algorithmPromise])
     .then(responses => Promise.all(responses.map(resp => resp.json())))
-    .then(([attrs, filtAttrs, algs]) => {
+    .then(([media, algs]) => {
       self.postMessage({
         command: "algorithms",
         algorithms: algs,
       });
-      setupSections(attrs, filtAttrs, msg.projectFilter);
+      setupSections(media, msg.projectFilter);
     })
     .catch(err => console.log("Error initializing web worker: " + err));
   } else if (msg.command == "moveFileToNew") {
@@ -123,6 +114,11 @@ self.addEventListener("message", async evt => {
       const toSection = self.sections.get(msg.toSection);
       const media = fromSection.removeMedia(msg.mediaId);
       toSection.addMedia(media);
+      this.fetchMedia();
+      self.postMessage({
+        command: "updateOverview",
+        sectionName: this._name,
+      });
     });
   } else if (msg.command == "renameSection") {
     const section = self.sections.get(msg.fromName);
@@ -247,12 +243,11 @@ class SectionData {
     this._mediaIds = [];
     this._search = search;
     this._numMedia = numMedia;
-    this.fetchMedia();
   }
 
   setPage(start, stop) {
-    this._start = start;
-    this._stop = stop;
+    this._start = Number(start);
+    this._stop = Number(stop);
     this.fetchMedia();
   }
 
@@ -317,11 +312,6 @@ class SectionData {
     this._mediaIds.unshift(media.id);
     this._mediaById.set(media.id, media);
     this._numMedia++;
-    this.fetchMedia();
-    self.postMessage({
-      command: "updateOverview",
-      sectionName: this._name,
-    });
   }
 
   _emitUpdateUnthrottled() {
@@ -428,59 +418,55 @@ function saveSectionOrder() {
   });
 }
 
-function setupSections(sectionCounts, filteredCounts, projectFilter) {
-  for (const section of Object.keys(sectionCounts)) {
-    if (!self.sectionOrder.includes(section)) {
-      self.sectionOrder.push(section);
+function addMediaToSections(media) {
+  for (const elem of media.reverse()) {
+    const section = elem.attributes.tator_user_sections;
+    if (self.sections.has(section)) {
+      self.sections.get(section).addMedia(elem);
+    } else {
+      const newSection = new SectionData(section, 0, projectFilter);
+      newSection.addMedia(elem);
+      self.sections.set(section, newSection);
     }
   }
-  const invalidSections = [];
-  for (const section of self.sectionOrder) {
-    if (!(section in sectionCounts)) {
-      invalidSections.push(section);
-    }
-  }
-  for (const section of invalidSections) {
-    const removeIndex = self.sectionOrder.indexOf(section);
-    self.sectionOrder.splice(removeIndex, 1);
-  }
+}
+
+function setupSections(media, projectFilter) {
+  self.sections = new Map();
+  addMediaToSections(media);
+  self.sectionOrder = Array.from(self.sections.keys());
   self.sectionOrder.sort((left, right) => {
     return left.toLowerCase().localeCompare(right.toLowerCase());
   });
   saveSectionOrder();
-  self.sections = new Map();
-  for (const section in sectionCounts) {
-    let data;
-    if (section in filteredCounts) {
-      data = new SectionData(section, filteredCounts[section], projectFilter);
-    } else {
-      data = new SectionData(section, 0, projectFilter);
-    }
-    self.sections.set(section, data);
-  }
   self.postMessage({
     command: "workerReady"
   });
   loadSections();
 }
 
-function updateSections(sectionCounts, projectFilter) {
+function updateSections(media, projectFilter) {
   for (const sectionName of self.sectionOrder) {
     if (self.sections.has(sectionName)) {
       const section = self.sections.get(sectionName);
-      if (sectionName in sectionCounts) {
-        section.setFilter(sectionCounts[sectionName], projectFilter);
-      } else {
-        section.setFilter(0, projectFilter);
-      }
+      section.setFilter(0, projectFilter);
+    }
+  }
+  addMediaToSections(media);
+  for (const sectionName of self.sectionOrder) {
+    if (self.sections.has(sectionName)) {
+      const section = self.sections.get(sectionName);
+      section._emitUpdate();
     }
   }
 }
 
-function updateSection(sectionCounts, sectionFilter) {
-  for (const sectionName in sectionCounts) {
+function updateSection(sectionName, media, sectionFilter) {
+  if (self.sections.has(sectionName)) {
     const section = self.sections.get(sectionName);
-    section.setFilter(sectionCounts[sectionName], sectionFilter);
+    section.setFilter(0, sectionFilter);
+    addMediaToSections(media);
+    section._emitUpdate();
   }
 }
 
