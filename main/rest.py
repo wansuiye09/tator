@@ -118,6 +118,7 @@ from django.contrib.gis.measure import D as GisDistance
 from django.db.models.expressions import RawSQL
 from django.db.models.expressions import ExpressionWrapper
 from django.contrib.postgres.aggregates import ArrayAgg
+from django.contrib.postgres.search import SearchVector
 
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
@@ -1065,49 +1066,19 @@ def get_media_queryset(project, query_params, attr_filter):
     if name != None:
         queryset = queryset.filter(name=name)
 
-    if search != None:
-        media_queries = []
-        # Find string and enum attribute types
-        attr_types = AttributeTypeBase.objects.filter(project=project)
-        for attr_type in attr_types:
-            is_str = isinstance(attr_type, AttributeTypeString)
-            is_enum = isinstance(attr_type, AttributeTypeEnum)
-            if is_str or is_enum:
-                entity_type = attr_type.applies_to
-                name_filter = {f'attributes__{attr_type.name}__icontains': search}
-                medias = None
-                if isinstance(entity_type, EntityTypeLocalizationBase):
-                    entities = EntityLocalizationBase.objects.filter(
-                        meta=entity_type,
-                        **name_filter,
-                    )
-                    medias = entities.values('media').distinct()
-                elif isinstance(entity_type, EntityTypeState):
-                    entities = EntityState.objects.filter(
-                        meta=entity_type,
-                        **name_filter,
-                    )
-                    medias = entities.values('association__media').distinct()
-                elif isinstance(entity_type, EntityTypeMediaBase):
-                    entities = EntityMediaBase.objects.filter(
-                        meta=entity_type,
-                        **name_filter,
-                    )
-                    medias = entities.values('pk').distinct()
-                if medias:
-                    media_queries.append(medias)
-
-        search_qs = EntityMediaBase.objects.filter(
-            Q(name__icontains=search) | Q(attributes__tator_user_sections__icontains=search),
-            project=project
-        ).values('pk').distinct()
-        search_qs = search_qs.union(*media_queries)
-        queryset = queryset.filter(pk__in=search_qs)
-
     if md5 != None:
         queryset = queryset.filter(md5=md5)
 
     queryset = attr_filter.filter_by_attribute(queryset)
+
+    if search != None:
+        queryset = queryset.annotate(search=SearchVector(
+            'name',
+            'attributes',
+            'entitylocalizationbase__attributes',
+            'associationtype__entitystate__attributes',
+        ))
+        queryset = queryset.filter(search=search).distinct()
 
     queryset = queryset.order_by("name")
 
