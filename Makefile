@@ -111,6 +111,7 @@ status:
 
 .ONESHELL:
 
+.PHONY: main/version.py
 cluster: main/version.py
 	$(MAKE) images cluster-deps cluster-install
 
@@ -150,9 +151,9 @@ containers/tator_algo_marshal/Dockerfile.gen: containers/tator_algo_marshal/Dock
 	echo $@ $<
 	./externals/build_tools/makocc.py -o $@ $<
 
-tator-image: containers/tator/Dockerfile.gen
+tator-image: main/version.py containers/tator/Dockerfile.gen
 	$(MAKE) min-js min-css
-	docker build $(shell ./externals/build_tools/multiArch.py --buildArgs) -t $(DOCKERHUB_USER)/tator_online:$(GIT_VERSION) -f $< . || exit 255
+	docker build $(shell ./externals/build_tools/multiArch.py --buildArgs) -t $(DOCKERHUB_USER)/tator_online:$(GIT_VERSION) -f containers/tator/Dockerfile.gen . || exit 255
 	docker push $(DOCKERHUB_USER)/tator_online:$(GIT_VERSION)
 	sleep 1
 	touch -d "$(shell docker inspect -f '{{ .Created }}' ${DOCKERHUB_USER}/tator_online)" tator-image
@@ -191,11 +192,6 @@ transcoder-image: containers/tator_transcoder/Dockerfile.gen
 cross-info: ./externals/build_tools/multiArch.py
 	./externals/build_tools/multiArch.py  --help
 
-.PHONY: externals/build_tools/version.py
-externals/build_tools/version.py:
-	externals/build_tools/version.sh > externals_build_tools/version.py
-
-.PHONY: main/version.py
 main/version.py:
 	externals/build_tools/version.sh > main/version.py
 	chmod +x main/version.py
