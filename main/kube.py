@@ -16,6 +16,16 @@ from .version import Git
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+# Define constants here based on configuration from
+# values.yaml
+DOCKERHUB_USER = os.getenv("DOCKERHUB_USER")
+if DOCKERHUB_USER == "":
+    DOCKERHUB_USER = None
+
+MARSHAL_IMAGE = f"tator_algo_marshal:{Git.sha}"
+if DOCKERHUB_USER:
+    MARSHAL_IMAGE = f"{DOCKERHUB_USER}/{marshal_image}"
+
 class JobManagerMixin:
     """ Defines functions for job management.
     """
@@ -135,10 +145,8 @@ class TatorTranscode(JobManagerMixin):
         }
 
         image_name = f"cvisionai/tator_transcoder:{Git.sha}"
-        dockerhub_user = os.getenv("DOCKERHUB_USER")
-        if dockerhub_user == "":
-            dockerhub_user = None
-        if dockerhub_user:
+        
+        if DOCKERHUB_USER:
             image_name = f"{dockerhub_user}/{image_name}"
 
         # Define persistent volume claim.
@@ -326,7 +334,7 @@ class TatorTranscode(JobManagerMixin):
         progress_task = {
             'name': 'progress',
             'container': {
-                'image': 'cvisionai/tator_algo_marshal:latest',
+                'image': MARSHAL_IMAGE,
                 'imagePullPolicy': 'IfNotPresent',
                 'command': ['python3',],
                 'args': [
@@ -496,7 +504,7 @@ class TatorAlgorithm(JobManagerMixin):
             failed_task = {
                 'name': 'tator-failed',
                 'container': {
-                    'image': 'cvisionai/tator_algo_marshal:latest',
+                    'image': MARSHAL_IMAGE,
                     'imagePullPolicy': 'Always',
                     'command': ['python3',],
                     'args': [
@@ -525,7 +533,7 @@ class TatorAlgorithm(JobManagerMixin):
             succeeded_task = {
                 'name': 'tator-succeeded',
                 'container': {
-                    'image': 'cvisionai/tator_algo_marshal:latest',
+                    'image': MARSHAL_IMAGE,
                     'imagePullPolicy': 'Always',
                     'command': ['python3',],
                     'args': [

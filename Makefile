@@ -165,7 +165,7 @@ containers/PyTator-$(PYTATOR_VERSION)-py3-none-any.whl:
 	cp scripts/packages/pytator/dist/PyTator-$(PYTATOR_VERSION)-py3-none-any.whl containers
 marshal-image:  containers/tator_algo_marshal/Dockerfile.gen containers/PyTator-$(PYTATOR_VERSION)-py3-none-any.whl
 	docker build  $(shell ./externals/build_tools/multiArch.py  --buildArgs) -t $(DOCKERHUB_USER)/tator_algo_marshal:latest -f $< containers || exit 255
-	docker push $(DOCKERHUB_USER)/tator_algo_marshal:latest
+	docker push $(DOCKERHUB_USER)/tator_algo_marshal:$(GIT_VERSION)
 	sleep 1
 	touch -d "$(shell docker inspect -f '{{ .Created }}' ${DOCKERHUB_USER}/tator_algo_marshal)" marshal-image
 
