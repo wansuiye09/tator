@@ -122,7 +122,7 @@ cluster-install:
 	kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta4/aio/deploy/recommended.yaml # No helm chart for this version yet
 	helm install --debug --atomic --timeout 60m0s --set gitRevision=$(GIT_VERSION) tator helm/tator
 
-cluster-upgrade: main/version.py tator-image 
+cluster-upgrade: images
 	helm upgrade --debug --atomic --timeout 60m0s --set gitRevision=$(GIT_VERSION) tator helm/tator
 
 cluster-uninstall:
@@ -183,8 +183,8 @@ tus-image: containers/tus/Dockerfile.gen
 
 # Publish transcoder image to dockerhub so it can be used cross-cluster
 transcoder-image: containers/tator_transcoder/Dockerfile.gen
-	docker build $(shell ./externals/build_tools/multiArch.py --buildArgs) -t cvisionai/tator_transcoder:latest -f $< . || exit 255
-	docker push cvisionai/tator_transcoder:latest
+	docker build $(shell ./externals/build_tools/multiArch.py --buildArgs) -t cvisionai/tator_transcoder:$(GIT_VERSION) -f $< . || exit 255
+	docker push cvisionai/tator_transcoder:$(GIT_VERSION)
 	sleep 1
 	touch -d "$(shell docker inspect -f '{{ .Created }}' cvisionai/tator_transcoder)" tator-transcoder
 

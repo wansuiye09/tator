@@ -11,6 +11,7 @@ from kubernetes.config import load_incluster_config
 import yaml
 
 from .consumers import ProgressProducer
+from .version import Git
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -133,6 +134,13 @@ class TatorTranscode(JobManagerMixin):
             'segments': '/work/' + base + '_segments.json',
         }
 
+        image_name = f"cvisionai/tator_transcoder:{Git.sha}"
+        dockerhub_user = os.getenv("DOCKERHUB_USER")
+        if dockerhub_user == "":
+            dockerhub_user = None
+        if dockerhub_user:
+            image_name = f"{dockerhub_user}/{image_name}"
+
         # Define persistent volume claim.
         pvc = {
             'metadata': {
@@ -180,7 +188,7 @@ class TatorTranscode(JobManagerMixin):
         transcode_task = {
             'name': 'transcode',    
             'container': {
-                'image': 'cvisionai/tator_transcoder:latest',
+                'image': image_name,
                 'imagePullPolicy': 'IfNotPresent',
                 'command': ['python3',],
                 'args': [
@@ -204,7 +212,7 @@ class TatorTranscode(JobManagerMixin):
         thumbnail_task = {
             'name': 'thumbnail',
             'container': {
-                'image': 'cvisionai/tator_transcoder:latest',
+                'image': image_name,
                 'imagePullPolicy': 'IfNotPresent',
                 'command': ['python3',],
                 'args': [
@@ -229,7 +237,7 @@ class TatorTranscode(JobManagerMixin):
         segments_task = {
             'name': 'segments',
             'container': {
-                'image': 'cvisionai/tator_transcoder:latest',
+                'image': image_name,
                 'imagePullPolicy': 'IfNotPresent',
                 'command': ['python3',],
                 'args': [
@@ -253,7 +261,7 @@ class TatorTranscode(JobManagerMixin):
         upload_task = {
             'name': 'upload',
             'container': {
-                'image': 'cvisionai/tator_transcoder:latest',
+                'image': image_name,
                 'imagePullPolicy': 'IfNotPresent',
                 'command': ['python3',],
                 'args': [
