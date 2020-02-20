@@ -129,7 +129,7 @@ remoteTranscodes:
     -----END CERTIFICATE-----
 
 
-masterNode: 192.168.0.7
+masterNode: 192.168.0.18
 taintNode: "y or n"
 nvidiaPlugin: "y or n"
 joinNodes: "y or n"
