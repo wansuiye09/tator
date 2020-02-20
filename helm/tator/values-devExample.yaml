@@ -128,3 +128,14 @@ remoteTranscodes:
     <Insert certificate here>
     -----END CERTIFICATE-----
 
+
+masterNode: 192.168.0.7
+taintNode: "y or n"
+nvidiaPlugin: "y or n"
+joinNodes: "y or n"
+nodeName: node_name
+joinToken: ''
+masterIP: ''
+masterPort: ''
+hash: ''
+
