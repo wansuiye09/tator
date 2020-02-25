@@ -225,7 +225,8 @@ def FastEntityLocalizationSerializer(queryset):
         elif type(typeObj) == EntityTypeLocalizationDot:
             obj=EntityLocalizationDot
         subquery=obj.objects.filter(meta=category)
-        subquery=subquery.filter(id__in=ids).select_related('user').annotate(email=Cast('user__email', models.TextField()))
+        subquery=subquery.filter(id__in=ids).select_related('user').select_related('version').annotate(email=Cast('user__email', models.TextField()),
+                        version=Cast('version__pk', models.IntField()))
         temp_list=EntityLocalization_baseFields
         temp_list.append('email')
         if len(subquery) != 0:
